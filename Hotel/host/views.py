@@ -1,7 +1,7 @@
 from django.shortcuts import render,redirect,get_object_or_404
 from django.db.models import Count
 from .models import User 
-from .models import Hotel,Room,HotelAmenity
+from .models import Hotel,Room,HotelAmenity,ADexam
 from django.utils import timezone
 from django.core.paginator import Paginator,EmptyPage, PageNotAnInteger
 from .forms import HotelForm
@@ -164,4 +164,11 @@ def hotel_edit_amenities(request, hotel_id):
         'form': form,
         'hotel': hotel,
         'next': next_url
+    })
+def exam_view(request):
+    exams = ADexam.objects.filter(is_public=True)
+    return render(request, 'host/exam.html', {
+        'exams': exams,
+        'fio': 'Дубинина Анна Сергеевна',
+        'group': '231-365'
     })

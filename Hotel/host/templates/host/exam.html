@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Экзамены</title>
+</head>
+<body>
+    <h1>Дубинина Анна Сергеевна, группа 231-365</h1>
+    <h2>Список опубликованных экзаменов:</h2>
+
+    {% for exam in exams %}
+        <div style="border: 1px solid #ccc; margin-bottom: 15px; padding: 10px;">
+            <p><strong>Название экзамена:</strong> {{ exam.name }}</p>
+            <p><strong>Дата создания записи:</strong> {{ exam.created_at }}</p>
+            <p><strong>Дата проведения экзамена:</strong> {{ exam.exam_date }}</p>
+            <p><strong>Пользователи:</strong>
+                {% for user in exam.users.all %}
+                    {{ user.email }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </p>
+            <p><strong>Задание (картинка):</strong><br>
+                {% if exam.image %}
+                    <img src="{{ exam.image.url }}" width="300">
+                {% else %}
+                    <em>Нет изображения</em>
+                {% endif %}
+            </p>
+        </div>
+    {% empty %}
+        <p>Нет опубликованных экзаменов.</p>
+    {% endfor %}
+</body>
+</html>
