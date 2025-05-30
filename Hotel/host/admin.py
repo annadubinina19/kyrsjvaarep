@@ -2,7 +2,7 @@
 
 # Register your models here.
 from django.contrib import admin
-
+from django.utils.html import format_html
 from .models import (
     User, Hotel, Amenity, HotelAmenity, Room, Review, Promotion, HotelService, Booking, Payment,ADexam
 )
@@ -107,6 +107,11 @@ class PaymentAdmin(admin.ModelAdmin):
 @admin.register(ADexam)
 class ADexamAdmin(admin.ModelAdmin):
     list_display = ('name', 'exam_date', 'is_public', 'created_at')
+    def image_tag(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="max-height: 100px;"/>', obj.image.url)
+        return "-"
+    image_tag.short_description = 'Задание (изображение)'
     list_filter = ('is_public', 'created_at', 'exam_date')  # Фильтры справа
     search_fields = ('name', 'users__email')  # Поиск по названию экзамена и email пользователя
     filter_horizontal = ('users',)  # Удобный вид M2M выбора пользователей

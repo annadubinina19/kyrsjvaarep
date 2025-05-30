@@ -3,6 +3,7 @@ from django.urls import reverse
 # Create your models here.
 from django.db import models
 from django.utils import timezone
+from django.utils.html import format_html
 
 
 class RoomManager(models.Manager):
@@ -226,6 +227,11 @@ class ADexam(models.Model):
     image = models.ImageField("Задание (изображение)", upload_to='exams/')
     users = models.ManyToManyField(User, verbose_name="Пользователи, сдающие экзамен")
     is_public = models.BooleanField("Опубликовано", default=False)
+    def image_tag(self):
+        if self.image:
+            return format_html('<img src="{}" width="100" height="auto" />', self.image.url)
+        return "-"
+    image_tag.short_description = 'Фото'
 
     def __str__(self):
         return self.name    

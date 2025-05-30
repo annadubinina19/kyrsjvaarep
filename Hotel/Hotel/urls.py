@@ -25,7 +25,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
     path('', include('host.urls')),
-]
+]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 handler404 = 'host.views.custom_page_not_found_view'
 if settings.DEBUG:
     import debug_toolbar
