@@ -4,6 +4,7 @@ from django.urls import reverse
 from django.db import models
 from django.utils import timezone
 
+
 class RoomManager(models.Manager):
     def by_hotel(self, hotel):
         return self.filter(hotel=hotel)
@@ -218,3 +219,13 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment for booking {self.booking}"
+class ADexam(models.Model):
+    name = models.CharField("Название экзамена", max_length=200)
+    created_at = models.DateTimeField("Дата создания", auto_now_add=True)
+    exam_date = models.DateField("Дата проведения экзамена")
+    image = models.ImageField("Задание (изображение)", upload_to='exams/')
+    users = models.ManyToManyField(User, verbose_name="Пользователи, сдающие экзамен")
+    is_public = models.BooleanField("Опубликовано", default=False)
+
+    def __str__(self):
+        return self.name    
