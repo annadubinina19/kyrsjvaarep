@@ -4,7 +4,7 @@
 from django.contrib import admin
 
 from .models import (
-    User, Hotel, Amenity, HotelAmenity, Room, Review, Promotion, HotelService, Booking, Payment
+    User, Hotel, Amenity, HotelAmenity, Room, Review, Promotion, HotelService, Booking, Payment,ADexam
 )
 
 # Inline для связи HotelAmenity
@@ -103,3 +103,11 @@ class PaymentAdmin(admin.ModelAdmin):
     list_filter = ('payment_method', 'date')
     search_fields = ('booking__user__last_name',)
     raw_id_fields = ('booking',)
+
+@admin.register(ADexam)
+class ADexamAdmin(admin.ModelAdmin):
+    list_display = ('name', 'exam_date', 'is_public', 'created_at')
+    list_filter = ('is_public', 'created_at', 'exam_date')  # Фильтры справа
+    search_fields = ('name', 'users__email')  # Поиск по названию экзамена и email пользователя
+    filter_horizontal = ('users',)  # Удобный вид M2M выбора пользователей
+    date_hierarchy = 'exam_date'  # Навигация по дате проведения экзамена    
