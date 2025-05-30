@@ -1,0 +1,14 @@
+ {% extends "host/base.html" %}
+{% block title %}Удалить отель{% endblock %}
+
+{% block content %}
+<h2>Вы уверены, что хотите удалить "{{ hotel }}"?</h2>
+{% load static %}
+
+    <link rel="stylesheet" href="{% static 'css/hotel.css' %}">
+<form method="post">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-danger">Да, удалить</button>
+  <a href="{{ next }}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %}

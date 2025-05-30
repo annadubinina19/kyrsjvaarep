@@ -1,0 +1,15 @@
+<!-- templates/host/hotel_form.html -->
+{% extends "host/base.html" %}
+{% block title %}{{ block.super }} | {% block form_title %}Добавить отель{% endblock %}{% endblock %}
+
+{% block content %}
+<h2>{% block form_heading %}Добавить отель{% endblock %}</h2>
+{% load static %}
+<form method="post" enctype="multipart/form-data">
+    <link rel="stylesheet" href="{% static 'css/hotel.css' %}">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit" class="btn btn-primary">Сохранить</button>
+  <a href="{{ next }}" class="btn btn-secondary">Отмена</a>
+</form>
+{% endblock %} 

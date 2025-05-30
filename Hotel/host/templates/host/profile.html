@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Личный кабинет</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/stale.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <div class="logo">
+                <h1>FunnyTravel</h1>
+            </div>
+            <nav class="main-nav">
+    <div class="nav-wrapper">
+        <ul class="nav-menu">
+            <li><a href="#">Главная</a></li>
+            <li><a href="#">Туры</a></li>
+            <li><a href="#">О нас</a></li>
+            <li><a href="#">Контакты</a></li>
+        </ul>
+
+        <div class="nav-right">
+            {% if request.session.user_id %}
+                <span class="welcome-text">Добро пожаловать, {{ user.first_name }}!</span>
+                <a href="/lk/">👤 Личный кабинет</a>
+                <a href="/logout/">Выход</a>
+            {% else %}
+                <a href="#" class="login-button" onclick="showLoginForm()">Вход</a>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+    </header>        
+    <main>
+    <section class="search-section">
+        <div class="search-container">
+            <h2>Найди отель своей мечты</h2>
+            <form action="{% url 'search' %}" method="get" class="search-form">
+    <input type="text" name="location" placeholder="Город" required>
+    <input type="date" name="check_in" required min="{{ today }}">
+    <button type="submit">Поиск</button>
+</form>
+            </form>
+            
+        </div>
+    </section>
+    </main>
+    
+    
+</body>
+</html>

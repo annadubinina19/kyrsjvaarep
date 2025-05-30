@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+{% load customtags %}
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Путешествуй с нами</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/room.css' %}">
+    <script src="{% static 'js/login.js' %}"></script>
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <div class="logo">
+                <h1>{% site_title %}</h1>
+            </div>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="/">Главная</a></li>
+                    <li><a href="#">Туры</a></li>
+                    <li><a href="#">О нас</a></li>
+                    <li><a href="#">Контакты</a></li>
+                </ul>
+            </nav>
+            {% if request.session.user_id %}
+  <div>Добро пожаловать, {{ request.session.user_name }}!</div>
+  <a href="/profile/">👤 Личный кабинет</a>
+  <a href="/logout/">Выход</a>
+{% else %}
+  <a href="#" class="login-button" onclick="openLoginModal()">Вход</a>
+{% endif %}
+        </div>
+<h2>{{ hotel.name }}</h2>
+<p><strong>Город:</strong> {{ hotel.location }}</p>
+<p><strong>Контакты:</strong> {{ hotel.contact_info }}</p>
+<p><strong>Описание:</strong> {{ hotel.description }}</p>
+
+<h3>Доступные номера:</h3>
+{% get_rooms_by_hotel hotel.id as rooms %}
+{% for room in rooms %}
+    <div class="room-card">
+        <p><strong>Тип:</strong> {{ room.room_type }}</p>
+        <p><strong>Цена за ночь:</strong> {{ room.price_per_night|currency_format }} </p>
+        <p><strong>Макс. гостей:</strong> {{ room.max_guests }}</p>
+    </div>
+{% empty %}
+    <p>Нет доступных номеров.</p>
+{% endfor %}

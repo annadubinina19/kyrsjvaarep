@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+{% load customtags %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Путешествуй с нами</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/stele.css' %}">
+    <script src="{% static 'js/log.js' %}"></script>
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <div class="logo">
+                <h1>{% site_title %}</h1>
+            </div>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="/">Главная</a></li>
+                    <li><a href="#">Туры</a></li>
+                    <li><a href="#">О нас</a></li>
+                    <li><a href="#">Контакты</a></li>
+                </ul>
+            </nav>
+            {% if request.user.is_authenticated %}
+  <div>{% user_greeting %}</div>
+  <a href="/profile/">👤 Личный кабинет</a>
+  <a href="/logout/">Выход</a>
+{% else %}
+  <a href="#" class="login-button" onclick="openLoginModal()">Вход</a>
+{% endif %}
+    
+        </div>
+    </header>
+    <main>
+    <section class="search-section">
+        <div class="search-container">
+            <h2>Найди отель своей мечты</h2>
+            <form action="{% url 'search' %}" method="get" class="search-form">
+    <input type="text" name="location" placeholder="Город" required>
+    <input type="date" name="check_in" required min="{{ today }}">
+    <button type="submit">Поиск</button>
+</form>
+            </form>
+            
+        </div>
+    </section>
+    </main>
+    <div id="loginModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeLoginModal()">&times;</span>
+
+    <!-- ФОРМА ВХОДА -->
+    <div id="loginForm">
+      <h2>Вход</h2>
+      <form id="login-form" method="POST" action="/login/">
+        {% csrf_token %}
+        <input type="email" name="email" placeholder="Email" required><br>
+        <input type="password" name="password" placeholder="Пароль" required><br>
+        <button type="submit">Войти</button>
+      </form>
+      <p>Нет аккаунта? <a href="#" onclick="showRegisterForm()">Зарегистрироваться</a></p>
+    </div>
+
+    <!-- ФОРМА РЕГИСТРАЦИИ -->
+    <div id="registerForm" style="display:none;">
+      <h2>Регистрация</h2>
+      <form id="register-form" method="POST" action="/register/">
+        {% csrf_token %}
+        <input type="text" name="last_name" placeholder="Фамилия" required><br>
+        <input type="text" name="first_name" placeholder="Имя" required><br>
+        <input type="email" name="email" placeholder="Email" required><br>
+        <input type="password" name="password" placeholder="Пароль" required><br>
+        <input type="tel" name="phone_number" placeholder="Телефон" required><br>
+        <button type="submit">Зарегистрироваться</button>
+      </form>
+      <p>Уже есть аккаунт? <a href="#" onclick="showLoginForm()">Войти</a></p>
+    </div>
+    
+    </div>
+  
+
+</body>
+
+</html>
