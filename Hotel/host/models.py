@@ -40,7 +40,7 @@ class User(models.Model):
 
 # Модель Отели
 class Hotel(models.Model):
-    rating = [
+    RATING_CHOICES = [
         (1, '★☆☆☆☆'),
         (2, '★★☆☆☆'),
         (3, '★★★☆☆'),
@@ -48,10 +48,29 @@ class Hotel(models.Model):
         (5, '★★★★★'),
     ]
     name = models.CharField(max_length=255, verbose_name="Название")
-    location = models.CharField(max_length=255, verbose_name="Местоположение")
-    rating = models.IntegerField(choices=rating, verbose_name="Рейтинг")
+    location = models.CharField(
+        max_length=255,
+        verbose_name="Местоположение",
+        db_index=True,
+        db_collation='NOCASE'
+    )
+    rating = models.IntegerField(choices=RATING_CHOICES, verbose_name="Рейтинг")
     description = models.TextField(blank=True, null=True, verbose_name="Описание")
     contact_info = models.CharField(max_length=255, verbose_name="Контакты")
+    website = models.URLField(
+        max_length=200, 
+        blank=True, 
+        null=True, 
+        verbose_name="Веб-сайт",
+        help_text="Официальный сайт отеля"
+    )
+    booking_url = models.URLField(
+        max_length=200, 
+        blank=True, 
+        null=True, 
+        verbose_name="Ссылка на бронирование",
+        help_text="Прямая ссылка на страницу бронирования"
+    )
     photo = models.ImageField(upload_to='hotel_photos/', blank=True, null=True, verbose_name="Фото")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
     class Meta:
@@ -157,6 +176,20 @@ class Promotion(models.Model):
     description = models.TextField(blank=True, null=True, verbose_name="Описание")
     start_date = models.DateField(verbose_name="Дата начала")
     end_date = models.DateField(verbose_name="Дата окончания")
+    details_url = models.URLField(
+        max_length=200,
+        blank=True,
+        null=True,
+        verbose_name="Подробности акции",
+        help_text="Ссылка на страницу с подробным описанием акции"
+    )
+    booking_url = models.URLField(
+        max_length=200,
+        blank=True,
+        null=True,
+        verbose_name="Ссылка на бронирование",
+        help_text="Прямая ссылка для бронирования по акции"
+    )
 
     class Meta:
         verbose_name = "Акции"
@@ -188,6 +221,13 @@ class Booking(models.Model):
     check_out_date = models.DateField(verbose_name="Дата выезда")
     final_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Итоговая стоимость")
     created_at = models.DateTimeField(default=timezone.now)
+    confirmation_pdf = models.FileField(
+        upload_to='booking_confirmations/%Y/%m/%d/', 
+        verbose_name="PDF подтверждение",
+        blank=True,
+        null=True,
+        help_text="PDF файл с подтверждением бронирования"
+    )
 
     class Meta:
         verbose_name = "Бронирования"
@@ -195,6 +235,17 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking by {self.user} for {self.room}"
+
+    def save(self, *args, **kwargs):
+        if self.confirmation_pdf:
+            # Удаляем старый файл при обновлении
+            try:
+                old_booking = Booking.objects.get(pk=self.pk)
+                if old_booking.confirmation_pdf != self.confirmation_pdf:
+                    old_booking.confirmation_pdf.delete(save=False)
+            except Booking.DoesNotExist:
+                pass
+        super().save(*args, **kwargs)
 
 # Модель Платеж
 class Payment(models.Model):

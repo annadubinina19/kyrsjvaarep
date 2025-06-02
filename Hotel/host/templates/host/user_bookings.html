@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+{% load customtags %}
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Мои бронирования</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <div class="logo">
+                <h1>FunnyTravel</h1>
+            </div>
+            <nav class="main-nav">
+                <div class="nav-wrapper">
+                    <ul class="nav-menu">
+                        <li><a href="/">Главная</a></li>
+                        <li><a href="#">Туры</a></li>
+                        <li><a href="#">О нас</a></li>
+                        <li><a href="#">Контакты</a></li>
+                    </ul>
+
+                    <div class="nav-right">
+                        <span class="welcome-text">Добро пожаловать, {{ user.first_name }}!</span>
+                        <a href="/logout/">Выход</a>
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main class="bookings-page">
+        <div class="container">
+            <h2 class="page-title">Мои бронирования</h2>
+            
+            <div class="user-info-card">
+                <h3>Личная информация</h3>
+                <div class="user-details">
+                    <p><strong>Имя:</strong> {{ user.first_name }}</p>
+                    <p><strong>Фамилия:</strong> {{ user.last_name }}</p>
+                    <p><strong>Email:</strong> {{ user.email }}</p>
+                    <p><strong>Телефон:</strong> {{ user.phone_number }}</p>
+                </div>
+            </div>
+
+            <div class="bookings-list">
+                <h3>История бронирований</h3>
+                {% if bookings %}
+                    {% for booking in bookings %}
+                        <div class="booking-item">
+                            <div class="booking-header">
+                                <h4>Бронирование #{{ booking.id }}</h4>
+                                <span class="booking-date">{{ booking.created_at|date:"d.m.Y" }}</span>
+                            </div>
+                            <div class="booking-details">
+                                <p><strong>Отель:</strong> {{ booking.room.hotel.name }}</p>
+                                <p><strong>Тип номера:</strong> {{ booking.room.get_room_type_display }}</p>
+                                <p><strong>Даты проживания:</strong> {{ booking.check_in_date|date:"d.m.Y" }} - {{ booking.check_out_date|date:"d.m.Y" }}</p>
+                                <p><strong>Стоимость:</strong> {{ booking.final_price }} руб.</p>
+                            </div>
+                            {% if booking.confirmation_pdf %}
+                                <div class="booking-actions">
+                                    <a href="{{ booking.confirmation_pdf.url }}" class="download-btn" target="_blank">
+                                        Скачать подтверждение
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="no-bookings">
+                        <p>У вас пока нет бронирований</p>
+                        <a href="/" class="search-hotels-btn">Найти отель</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</body>
+</html> 

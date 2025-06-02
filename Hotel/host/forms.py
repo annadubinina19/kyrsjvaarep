@@ -7,6 +7,7 @@ class HotelForm(forms.ModelForm):
     class Meta:
         model = Hotel
         fields = ['name', 'location', 'rating', 'description', 'contact_info', 'photo']
+        exclude = ['created_at']
 
         widgets = {
             'name': forms.TextInput(attrs={
@@ -34,6 +35,29 @@ class HotelForm(forms.ModelForm):
                 'class': 'form-control'
             }),
         }
+
+        help_texts = {
+            'name': 'Введите название отеля (минимум 3 символа)',
+            'rating': 'Выберите рейтинг от 1 до 5',
+            'photo': 'Загрузите фотографию отеля в формате jpg, png и т.д.',
+        }
+
+        error_messages = {
+            'name': {
+                'required': 'Название отеля обязательно для заполнения',
+                'max_length': 'Название слишком длинное',
+            },
+            'rating': {
+                'invalid_choice': 'Выберите корректный рейтинг',
+                'required': 'Рейтинг обязателен',
+            },
+        }
+    class Media:
+        css = {
+            'all': ('css/hotel.css',)  # путь к вашему CSS файлу в static
+        }
+          
+    
     def clean_name(self):
         name = self.cleaned_data.get('name')
         if len(name) < 3:

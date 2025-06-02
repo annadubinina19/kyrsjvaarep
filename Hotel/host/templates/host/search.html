@@ -101,7 +101,7 @@
             </div>
 
             <div class="hotel-info">
-                <h4>{{ hotel.name|upper|truncatechars:15 }}</h4>
+                <h4>{{ hotel.name|upper|truncatechars:15 }}</h4> 
                 </a>
                 <p><strong>Описание:</strong> {{ hotel.description }}</p>
                 <p><strong>Контакты:</strong> {{ hotel.contact_info }}</p>
@@ -109,6 +109,7 @@
                 <strong>Удобства:</strong>
     {% for ha in hotel.hotelamenity_set.all %}
         <span class="badge bg-secondary">{{ ha.amenity.name }}</span>
+        <p><strong>Ссылка на сайт:</strong>{{ hotel.website }}</p>
         
     {% endfor %}
             </div>

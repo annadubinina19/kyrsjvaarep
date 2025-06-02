@@ -24,7 +24,7 @@
         <div class="nav-right">
             {% if request.session.user_id %}
                 <span class="welcome-text">Добро пожаловать, {{ user.first_name }}!</span>
-                <a href="/lk/">👤 Личный кабинет</a>
+                <a href="{% url 'user_bookings' %}">👤 Личный кабинет</a>
                 <a href="/logout/">Выход</a>
             {% else %}
                 <a href="#" class="login-button" onclick="showLoginForm()">Вход</a>

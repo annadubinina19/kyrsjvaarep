@@ -1,5 +1,5 @@
 from django.shortcuts import render,redirect,get_object_or_404
-from django.db.models import Count
+from django.db.models import Count, Avg
 from .models import User 
 from .models import Hotel,Room,HotelAmenity
 from django.utils import timezone
@@ -8,37 +8,53 @@ from .forms import HotelForm
 from .forms import HotelAmenityForm
 from django.db.models import Prefetch
 from django.urls import reverse
-from django.http import HttpResponse
+from django.http import HttpResponseRedirect
+from django.forms.models import model_to_dict
+from django.conf import settings
+import os
 
 
-def index(request):
-    return render(request, 'host/index.html')
+
 # Create your views here.
 def search(request):
     location = request.GET.get('location', '').strip()
     check_in = request.GET.get('check_in')
     sort_by = request.GET.get('sort_by')
     today = timezone.now().date().isoformat()
+    
+    # Инициализируем переменные
     hotels = Hotel.objects.prefetch_related(
-        Prefetch('hotelamenity_set', queryset=HotelAmenity.objects.select_related('amenity'))
+        Prefetch('hotelamenity_set', 
+                queryset=HotelAmenity.objects.select_related('amenity'))
     )
-    hotels = []
     hotel_count = 0
 
     if location:
-        hotels = Hotel.objects.filter(location__icontains=location).annotate(room_count=Count('rooms'))
+        # Используем icontains для поиска без учета регистра
+        hotels = hotels.filter(location__icontains=location)
+        hotels = hotels.annotate(room_count=Count('rooms'))
         
-        if sort_by in ['rating', '-rating' , 'room_count', '-room_count']:
+        if sort_by in ['rating', '-rating', 'room_count', '-room_count']:
             hotels = hotels.order_by(sort_by)
+        else:
+            hotels = hotels.order_by('-rating')  # сортировка по умолчанию
+            
         hotel_count = hotels.count()
-        paginator = Paginator(hotels, 1)  # по 3 отеля на страницу
-        page_number = request.GET.get('page', 1)
-        try:
-            hotels = paginator.page(page_number)
-        except PageNotAnInteger:
-            hotels = paginator.page(1)
-        except EmptyPage:
-            hotels = paginator.page(paginator.num_pages)
+    else:
+        # Если поисковый запрос пустой, показываем все отели
+        hotels = hotels.annotate(room_count=Count('rooms')).order_by('-rating')
+        hotel_count = hotels.count()
+
+    # Пагинация
+    paginator = Paginator(hotels, 1)  # по 1 отелю на страницу
+    page_number = request.GET.get('page', 1)
+    try:
+        hotels = paginator.page(page_number)
+    except PageNotAnInteger:
+        hotels = paginator.page(1)
+    except EmptyPage:
+        hotels = paginator.page(paginator.num_pages)
+    
     return render(request, 'host/search.html', {
         'hotels': hotels,
         'hotel_count': hotel_count,
@@ -88,15 +104,62 @@ def profile(request):
         return redirect('/')  # если не авторизован
 
     user = get_object_or_404(User, id=user_id)
+    bookings = user.booking_set.all().select_related('room__hotel').order_by('-created_at')
     today = timezone.now().date().isoformat()
-    return render(request, 'host/profile.html', {'user': user, 'today': today})
+    return render(request, 'host/profile.html', {
+        'user': user,
+        'bookings': bookings,
+        'today': today
+    })
 def logout_user(request):
     request.session.flush()
     return redirect('/')
 
 def index(request):
     today = timezone.now().date().isoformat()
-    return render(request, 'host/index.html', {'today': today})
+    
+    # Проверяем наличие отелей в базе
+    has_hotels = Hotel.objects.exists()
+    
+    if not has_hotels:
+        return render(request, 'host/index.html', {
+            'today': today,
+            'no_hotels': True
+        })
+    
+    # Получаем топ 5 отелей с использованием values()
+    top_hotels = list(Hotel.objects.values(
+        'id', 
+        'name', 
+        'location', 
+        'rating', 
+        'description', 
+        'photo'
+    ).order_by('-rating')[:5])
+
+    # Добавляем URL изображения для каждого отеля
+    for hotel in top_hotels:
+        if hotel['photo']:
+            # Преобразуем путь к файлу в URL
+            hotel['photo_url'] = os.path.join(settings.MEDIA_URL, str(hotel['photo']))
+        hotel['rating_range'] = range(int(hotel['rating']))  # Для отображения звезд
+
+    # Получаем список уникальных городов с помощью values_list
+    cities = Hotel.objects.values_list('location', flat=True).distinct()
+    
+    # Получаем статистику по рейтингам отелей в каждом городе
+    city_stats = Hotel.objects.values('location').annotate(
+        avg_rating=Avg('rating'),
+        hotel_count=Count('id')
+    ).order_by('-avg_rating')
+
+    return render(request, 'host/index.html', {
+        'today': today,
+        'top_hotels': top_hotels,
+        'cities': cities,
+        'city_stats': city_stats,
+        'has_hotels': has_hotels
+    })
 
 
 def hotel_detail(request, hotel_id):
@@ -122,10 +185,16 @@ def hotel_create(request):
     next_url = request.GET.get('next', reverse('index'))
 
     if request.method == 'POST' and form.is_valid():
+        # Получаем очищенные данные формы
+        cleaned_data = form.cleaned_data
+        name = cleaned_data.get('name')
+        location = cleaned_data.get('location')
+        print(f"Добавляется отель: {name}, город: {location}")
+
         form.save(commit=True)
         return redirect(next_url)
 
-    return render(request, 'host/hotel_form.html', {'form': form,'next': next_url})
+    return render(request, 'host/hotel_form.html', {'form': form, 'next': next_url})
 
 
 def hotel_update(request, pk):
@@ -158,10 +227,23 @@ def hotel_edit_amenities(request, hotel_id):
         form = HotelAmenityForm(request.POST, instance=hotel)
         if form.is_valid():
             form.save()
-            return redirect(next_url)
+            return HttpResponseRedirect(next_url)
 
     return render(request, 'host/hotel_amenity_form.html', {
         'form': form,
         'hotel': hotel,
         'next': next_url
+    })
+
+def user_bookings(request):
+    user_id = request.session.get('user_id')
+    if not user_id:
+        return redirect('/')  # если не авторизован
+
+    user = get_object_or_404(User, id=user_id)
+    bookings = user.booking_set.all().select_related('room__hotel').order_by('-created_at')
+    
+    return render(request, 'host/user_bookings.html', {
+        'user': user,
+        'bookings': bookings
     })

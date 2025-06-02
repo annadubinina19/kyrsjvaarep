@@ -13,8 +13,7 @@ urlpatterns = [
     path('hotel/<int:pk>/edit/', views.hotel_update, name='hotel_update'),
     path('hotel/<int:pk>/delete/', views.hotel_delete, name='hotel_delete'),
     path('hotel/<int:hotel_id>/edit-amenities/', views.hotel_edit_amenities, name='hotel_edit_amenities'),
-    
-    
+    path('my-bookings/', views.user_bookings, name='user_bookings'),
 ]
 
 
