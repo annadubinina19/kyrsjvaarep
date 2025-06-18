@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Путешествуй с нами</title>
     {% load static %}
-    <link rel="stylesheet" href="{% static 'css/main.css' %}">
-    <script src="{% static 'js/log.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'css/maain.css' %}">
+    <script src="{% static 'js/logg.js' %}"></script>
 </head>
 <body>
     <header class="site-header">
@@ -23,14 +23,15 @@
                     <li><a href="#">Контакты</a></li>
                 </ul>
             </nav>
-            {% if request.user.is_authenticated %}
-  <div>{% user_greeting %}</div>
-  <a href="{% url 'user_bookings' %}">👤 Личный кабинет</a>
-  <a href="/logout/">Выход</a>
-{% else %}
-  <a href="#" class="login-button" onclick="openLoginModal()">Вход</a>
-{% endif %}
-    
+            <div class="auth-buttons">
+                {% if request.session.user_id %}
+                    <div class="user-info">Добро пожаловать, {{ request.session.user_name }}!</div>
+                    <a href="/profile/" class="profile-btn">👤 Личный кабинет</a>
+                    <a href="/logout/" class="logout-btn">Выход</a>
+                {% else %}
+                    <a href="#" class="login-button" onclick="openLoginModal()">Вход</a>
+                {% endif %}
+            </div>
         </div>
     </header>
     <main>
@@ -38,14 +39,85 @@
         <div class="search-container">
             <h2>Найди отель своей мечты</h2>
             <form action="{% url 'search' %}" method="get" class="search-form">
-    <input type="text" name="location" placeholder="Город" required>
-    <input type="date" name="check_in" required min="{{ today }}">
-    <button type="submit">Поиск</button>
-</form>
+                <input type="text" name="location" placeholder="Город" required>
+                <input type="date" name="check_in" required min="{{ today }}">
+                <button type="submit">Поиск</button>
             </form>
-            
         </div>
     </section>
+
+    <!-- Секция с акциями -->
+     <h2>Специальные предложения</h2>
+    <section class="promotions-section">
+        <div class="container">
+            {% if active_promotions %}
+                <div class="promotions-grid">
+                    {% for promotion in active_promotions %}
+                        <div class="promotion-card">
+                            <div class="promotion-content">
+                                <h3>{{ promotion.title }}</h3>
+                                <p class="promotion-hotel">🏨 {{ promotion.hotel.name }}</p>
+                                <p class="promotion-dates">📅 Действует до {{ promotion.end_date|date:"d.m.Y" }}</p>
+                                {% if promotion.description %}
+                                    <p class="promotion-description">{{ promotion.description|truncatewords:30 }}</p>
+                                {% endif %}
+                                <div class="promotion-buttons">
+                                    <a href="{% url 'hotel_detail' hotel_id=promotion.hotel.id %}" class="view-rooms-btn">Посмотреть номера</a>
+                                    {% if promotion.details_url %}
+                                        <a href="{{ promotion.details_url }}" class="details-btn" target="_blank">Подробнее об акции</a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="no-promotions">В данный момент нет активных акций</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Секция с отзывами -->
+     <h2>Лучшие отзывы</h2>
+    <section class="reviews-section">
+        <div class="container">
+            {% if top_reviews %}
+                <div class="reviews-grid">
+                    {% for review in top_reviews %}
+                        <div class="review-card">
+                            <div class="review-header">
+                                <div class="review-hotel">
+                                    <h3>{{ review.hotel.name }}</h3>
+                                    <p class="hotel-location">📍 {{ review.hotel.location }}</p>
+                                </div>
+                                <div class="review-rating">
+                                    <div class="stars">
+                                        {% for _ in review.rating|get_range %}
+                                            ⭐
+                                        {% endfor %}
+                                    </div>
+                                    <span class="rating-number">{{ review.rating }}/5</span>
+                                </div>
+                            </div>
+                            <div class="review-content">
+                                <p class="review-text">{{ review.comment|truncatewords:30 }}</p>
+                            </div>
+                            <div class="review-footer">
+                                <div class="reviewer-info">
+                                    <p class="reviewer-name">{{ review.user.first_name }} {{ review.user.last_name }}</p>
+                                    <p class="review-date">{{ review.created_at|date:"d.m.Y" }}</p>
+                                </div>
+                                <a href="{% url 'hotel_detail' hotel_id=review.hotel.id %}" class="view-hotel-btn">Посмотреть отель</a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="no-reviews">Пока нет отзывов с высоким рейтингом</p>
+            {% endif %}
+        </div>
+    </section>
+
     <h2>Топ отелей</h2>
     <section class="top-hotels">
         <div class="container">
@@ -119,6 +191,7 @@
     <!-- ФОРМА ВХОДА -->
     <div id="loginForm">
       <h2>Вход</h2>
+      <div id="login-message" class="message"></div>
       <form id="login-form" method="POST" action="/login/">
         {% csrf_token %}
         <input type="email" name="email" placeholder="Email" required><br>
@@ -131,6 +204,7 @@
     <!-- ФОРМА РЕГИСТРАЦИИ -->
     <div id="registerForm" style="display:none;">
       <h2>Регистрация</h2>
+      <div id="register-message" class="message"></div>
       <form id="register-form" method="POST" action="/register/">
         {% csrf_token %}
         <input type="text" name="last_name" placeholder="Фамилия" required><br>

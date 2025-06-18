@@ -80,14 +80,14 @@
     </div>
     
     {% for hotel in hotels %}
-        <a href="{{ hotel.get_absolute_url }}" class="hotel-card-link">
+    <a href="{% url 'hotel_detail' hotel.id %}" class="hotel-card-link">
         <div class="hotel-card">
             <div class="hotel-photo">
-                {% if hotel.photo %}
-                    <img src="{{ hotel.photo.url }}" alt="{{ hotel.name }}">
-                {% else %}
-                    <img src="{% static 'img/no-image.png' %}" alt="Нет фото">
-                {% endif %}
+              {% if hotel.photo %}
+              <img src="{{ hotel.photo }}" alt="{{ hotel.name }}">
+          {% else %}
+              <img src="{% static 'img/no-image.png' %}" alt="Нет фото">
+          {% endif %}
                 <div class="rating-stars">
     {% for i in "12345" %}
         {% if forloop.counter <= hotel.rating %}
@@ -107,11 +107,20 @@
                 <p><strong>Контакты:</strong> {{ hotel.contact_info }}</p>
                 <p><strong>Местоположение:</strong> {{ hotel.location }}</p>
                 <strong>Удобства:</strong>
-    {% for ha in hotel.hotelamenity_set.all %}
-        <span class="badge bg-secondary">{{ ha.amenity.name }}</span>
-        <p><strong>Ссылка на сайт:</strong>{{ hotel.website }}</p>
-        
-    {% endfor %}
+{% if hotel.amenities %}
+  {% for amenity in hotel.amenities %}
+    <span class="badge bg-secondary">{{ amenity.name }}</span>
+  {% endfor %}
+{% else %}
+  <span>Нет удобств</span>
+{% endif %}
+<p><strong>Ссылка на сайт:</strong>
+  {% if hotel.website %}
+    <a href="{{ hotel.website }}" target="_blank">{{ hotel.website }}</a>
+  {% else %}
+    Нет сайта
+  {% endif %}
+</p>
             </div>
         </div>
         

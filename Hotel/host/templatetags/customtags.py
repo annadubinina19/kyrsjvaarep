@@ -22,3 +22,10 @@ def currency_format(value):
 @register.simple_tag
 def get_rooms_by_hotel(hotel_id):
     return Room.objects.by_hotel(hotel_id).available().order_by_price()
+@register.filter
+def get_range(value):
+    """
+    Фильтр для создания диапазона чисел.
+    Используется для отображения звезд рейтинга.
+    """
+    return range(value)

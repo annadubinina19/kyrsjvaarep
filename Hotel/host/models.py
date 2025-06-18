@@ -3,6 +3,8 @@ from django.urls import reverse
 # Create your models here.
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import AbstractUser
+from simple_history.models import HistoricalRecords
 
 class RoomManager(models.Manager):
     def by_hotel(self, hotel):
@@ -30,6 +32,7 @@ class User(models.Model):
     phone_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="Номер телефона")
     password = models.CharField(max_length=100, verbose_name="Пароль")
     role = models.CharField(max_length=50, verbose_name="Роль")
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Пользователь"
@@ -73,6 +76,7 @@ class Hotel(models.Model):
     )
     photo = models.ImageField(upload_to='hotel_photos/', blank=True, null=True, verbose_name="Фото")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
+    history = HistoricalRecords()
     class Meta:
         ordering = ['name']
         verbose_name = "Отели" 
@@ -96,6 +100,7 @@ class Hotel(models.Model):
 class Amenity(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название")
     description = models.TextField(blank=True, null=True, verbose_name="Описание")
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Удобства"
@@ -109,6 +114,7 @@ class Amenity(models.Model):
 class HotelAmenity(models.Model):
     hotel = models.ForeignKey(Hotel, on_delete=models.CASCADE, verbose_name="Отель")
     amenity = models.ForeignKey(Amenity, on_delete=models.CASCADE, verbose_name="Удобство")
+    history = HistoricalRecords()
 
     class Meta:
         
@@ -133,6 +139,7 @@ class Room(models.Model):
     photo = models.ImageField(upload_to='room_photos/', blank=True, null=True, verbose_name="Фото")
      
     objects = RoomQuerySet.as_manager()
+    history = HistoricalRecords()
      
     class Meta:
         verbose_name = "Номера"
@@ -160,6 +167,7 @@ class Review(models.Model):
     rating = models.IntegerField(choices=rating, verbose_name="Рейтинг")
     comment = models.TextField(blank=True, null=True, verbose_name="Комментарий")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
+    history = HistoricalRecords()
     
     class Meta:
         verbose_name = "Отзывы"
@@ -190,6 +198,7 @@ class Promotion(models.Model):
         verbose_name="Ссылка на бронирование",
         help_text="Прямая ссылка для бронирования по акции"
     )
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Акции"
@@ -204,6 +213,7 @@ class HotelService(models.Model):
     service_name = models.CharField(max_length=255, verbose_name="Название услуги")
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Стоимость")
     description = models.TextField(blank=True, null=True, verbose_name="Описание")
+    history = HistoricalRecords()
     
     class Meta:
         verbose_name = "Услуги отеля"
@@ -215,12 +225,25 @@ class HotelService(models.Model):
 
 # Модель Бронирования
 class Booking(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Ожидает подтверждения'),
+        ('confirmed', 'Подтверждено'),
+        ('cancelled', 'Отменено'),
+        ('completed', 'Завершено')
+    ]
+    
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Пользователь")
     room = models.ForeignKey(Room, on_delete=models.CASCADE, verbose_name="Номер")
     check_in_date = models.DateField(verbose_name="Дата заезда")
     check_out_date = models.DateField(verbose_name="Дата выезда")
     final_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Итоговая стоимость")
     created_at = models.DateTimeField(default=timezone.now)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
+        verbose_name="Статус бронирования"
+    )
     confirmation_pdf = models.FileField(
         upload_to='booking_confirmations/%Y/%m/%d/', 
         verbose_name="PDF подтверждение",
@@ -228,6 +251,7 @@ class Booking(models.Model):
         null=True,
         help_text="PDF файл с подтверждением бронирования"
     )
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Бронирования"
@@ -262,6 +286,7 @@ class Payment(models.Model):
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Сумма")
     date = models.DateTimeField(auto_now_add=True, verbose_name="Дата платежа")
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Платеж"

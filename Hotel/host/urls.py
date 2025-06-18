@@ -14,6 +14,10 @@ urlpatterns = [
     path('hotel/<int:pk>/delete/', views.hotel_delete, name='hotel_delete'),
     path('hotel/<int:hotel_id>/edit-amenities/', views.hotel_edit_amenities, name='hotel_edit_amenities'),
     path('my-bookings/', views.user_bookings, name='user_bookings'),
+    path('add_review/<int:hotel_id>/', views.add_review, name='add_review'),
+    path('edit_review/<int:review_id>/', views.edit_review, name='edit_review'),
+    path('delete_review/<int:review_id>/', views.delete_review, name='delete_review'),
+    path('book-room/<int:room_id>/', views.book_room, name='book_room'),
 ]
 
 

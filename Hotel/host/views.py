@@ -1,109 +1,148 @@
-from django.shortcuts import render,redirect,get_object_or_404
-from django.db.models import Count, Avg
-from .models import User 
-from .models import Hotel,Room,HotelAmenity
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponseRedirect, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.db.models import Q, Sum, Avg, Count, Prefetch
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.utils import timezone
-from django.core.paginator import Paginator,EmptyPage, PageNotAnInteger
-from .forms import HotelForm
-from .forms import HotelAmenityForm
-from django.db.models import Prefetch
-from django.urls import reverse
-from django.http import HttpResponseRedirect
-from django.forms.models import model_to_dict
-from django.conf import settings
+from django.core.files.base import ContentFile
+from django.contrib.auth.models import User
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.http import HttpResponse
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from io import BytesIO
 import os
+from django.views.decorators.http import require_POST
+from datetime import datetime, timedelta
+from django.conf import settings
+from django.urls import reverse
+import requests
 
+from .models import (
+    User as CustomUser, Hotel, Amenity, HotelAmenity, Room, Review, 
+    Promotion, HotelService, Booking, Payment
+)
+from .forms import HotelForm, HotelAmenityForm
 
+# Здесь должны быть только обычные Django views для HTML-страниц, без DRF ViewSet-классов.
+# ... ваши обычные views ...
 
-# Create your views here.
 def search(request):
     location = request.GET.get('location', '').strip()
     check_in = request.GET.get('check_in')
     sort_by = request.GET.get('sort_by')
+    page = request.GET.get('page', 1)
     today = timezone.now().date().isoformat()
-    
-    # Инициализируем переменные
-    hotels = Hotel.objects.prefetch_related(
-        Prefetch('hotelamenity_set', 
-                queryset=HotelAmenity.objects.select_related('amenity'))
-    )
-    hotel_count = 0
 
-    if location:
-        # Используем icontains для поиска без учета регистра
-        hotels = hotels.filter(location__icontains=location)
-        hotels = hotels.annotate(room_count=Count('rooms'))
-        
-        if sort_by in ['rating', '-rating', 'room_count', '-room_count']:
-            hotels = hotels.order_by(sort_by)
-        else:
-            hotels = hotels.order_by('-rating')  # сортировка по умолчанию
-            
-        hotel_count = hotels.count()
-    else:
-        # Если поисковый запрос пустой, показываем все отели
-        hotels = hotels.annotate(room_count=Count('rooms')).order_by('-rating')
-        hotel_count = hotels.count()
+    params = {
+        'location': location,
+        'page': page,
+        'page_size': 1,
+    }
+    if sort_by:
+        params['ordering'] = sort_by
 
-    # Пагинация
-    paginator = Paginator(hotels, 1)  # по 1 отелю на страницу
-    page_number = request.GET.get('page', 1)
-    try:
-        hotels = paginator.page(page_number)
-    except PageNotAnInteger:
-        hotels = paginator.page(1)
-    except EmptyPage:
-        hotels = paginator.page(paginator.num_pages)
-    
+    api_url = request.build_absolute_uri('/api/hotels/')
+    response = requests.get(api_url, params=params, cookies=request.COOKIES)
+    data = response.json()
+
+    hotels = data.get('results', [])
+    hotel_count = data.get('count', 0)
+    next_url = data.get('next')
+    previous_url = data.get('previous')
+    page_size = settings.REST_FRAMEWORK.get('PAGE_SIZE', 1)
+    num_pages = (hotel_count // page_size) + (1 if hotel_count % page_size else 0)
+    current_page = int(page)
+
+    class HotelsPage:
+        def __init__(self, hotels, number, num_pages, next_url, previous_url):
+            self.object_list = hotels
+            self.number = number
+            self.paginator = self
+            self.num_pages = num_pages
+            self.has_next = bool(next_url)
+            self.has_previous = bool(previous_url)
+            self.next_page_number = number + 1 if self.has_next else number
+            self.previous_page_number = number - 1 if self.has_previous else number
+        def __iter__(self):
+            return iter(self.object_list)
+
+    hotels_page = HotelsPage(hotels, current_page, num_pages, next_url, previous_url)
+
     return render(request, 'host/search.html', {
-        'hotels': hotels,
+        'hotels': hotels_page,
         'hotel_count': hotel_count,
         'location': location,
         'check_in': check_in,
         'sort_by': sort_by,
         'today': today
     })
- # Импортируйте свою модель пользователя
 
+@require_POST
 def register_user(request):
-    if request.method == "POST":
+    try:
         last_name = request.POST['last_name']
         first_name = request.POST['first_name']
         email = request.POST['email']
         password = request.POST['password']
         phone_number = request.POST['phone_number']
 
-        # Сохраняем пользователя с ролью "гость"
-        User.objects.create(
+        if CustomUser.objects.filter(email=email).exists():
+            return JsonResponse({'success': False, 'message': 'Email уже зарегистрирован'})
+
+        CustomUser.objects.create(
             last_name=last_name,
             first_name=first_name,
             email=email,
-            password=password,
+            password=password,  
             phone_number=phone_number,
             role='гость'
         )
-        return redirect('/')  # или вернуть JSON в случае Ajax
-    return redirect('/')    
+        return JsonResponse({'success': True, 'message': 'Регистрация прошла успешно'})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})
+
+@require_POST
 def login_user(request):
-    if request.method == "POST":
-        email = request.POST.get("email")
-        password = request.POST.get("password")
+    email = request.POST.get("email")
+    password = request.POST.get("password")
 
-        try:
-            user = User.objects.get(email=email, password=password)
-            request.session['user_id'] = user.id
-            request.session['user_name'] = user.first_name
-            return redirect('profile')  # перенаправление на личный кабинет
-        except User.DoesNotExist:
-            return render(request, 'host/login_error.html', {'error': 'Неверный email или пароль'})
+    try:
+        user = CustomUser.objects.get(email=email, password=password)
+        request.session['user_id'] = user.id
+        request.session['user_name'] = user.first_name
+        return JsonResponse({
+            'success': True,
+            'message': f'Добро пожаловать, {user.first_name}!'
+        })
+    except CustomUser.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Неверный email или пароль'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': 'Произошла ошибка при входе'
+        })
 
-    return redirect('/')
 def profile(request):
     user_id = request.session.get('user_id')
     if not user_id:
         return redirect('/')  # если не авторизован
 
-    user = get_object_or_404(User, id=user_id)
+    user = get_object_or_404(CustomUser, id=user_id)
     bookings = user.booking_set.all().select_related('room__hotel').order_by('-created_at')
     today = timezone.now().date().isoformat()
     return render(request, 'host/profile.html', {
@@ -111,6 +150,7 @@ def profile(request):
         'bookings': bookings,
         'today': today
     })
+
 def logout_user(request):
     request.session.flush()
     return redirect('/')
@@ -128,15 +168,12 @@ def index(request):
         })
     
     # Получаем топ 5 отелей с использованием values()
-    top_hotels = list(Hotel.objects.values(
-        'id', 
-        'name', 
-        'location', 
-        'rating', 
-        'description', 
-        'photo'
-    ).order_by('-rating')[:5])
-
+    top_hotels = list(Hotel.objects.filter(
+    ~Q(rating__lt=2) & 
+    (Q(location='Москва') | ~Q(photo='')) 
+).values(
+    'id', 'name', 'location', 'rating', 'description', 'photo'
+).order_by('-rating')[:5])
     # Добавляем URL изображения для каждого отеля
     for hotel in top_hotels:
         if hotel['photo']:
@@ -153,14 +190,29 @@ def index(request):
         hotel_count=Count('id')
     ).order_by('-avg_rating')
 
+    # Получаем активные акции
+    current_date = timezone.now().date()
+    active_promotions = Promotion.objects.select_related('hotel').filter(
+        start_date__lte=current_date,
+        end_date__gte=current_date
+    ).order_by('end_date')
+
+    # Получаем топ отзывы (с рейтингом 4 или 5)
+    top_reviews = Review.objects.select_related('hotel', 'user').filter(
+    Q(rating__gte=4) &
+    (Q(comment__isnull=False) | Q(rating__gt=4)) &
+    ~Q(hotel__photo__isnull=True)
+).order_by('-created_at')[:6]  # Последние 6 отзывов
+
     return render(request, 'host/index.html', {
         'today': today,
         'top_hotels': top_hotels,
         'cities': cities,
         'city_stats': city_stats,
-        'has_hotels': has_hotels
+        'has_hotels': has_hotels,
+        'active_promotions': active_promotions,
+        'top_reviews': top_reviews
     })
-
 
 def hotel_detail(request, hotel_id):
     hotel = get_object_or_404(Hotel, id=hotel_id)
@@ -171,14 +223,14 @@ def hotel_detail(request, hotel_id):
         'hotel': hotel,
         'rooms': rooms
     })
+
 def custom_page_not_found_view(request, exception):
     print("⚠️  Кастомная 404 вызвана. Исключение:", exception)
     return render(request, '404.html', status=404)
+
 def rooms_list(request):
     rooms = Room.objects.all().order_by('price_per_night')  # сортировка по возрастанию цены
     return render(request, 'host/hotel_detail.html', {'rooms': rooms})
-
-
 
 def hotel_create(request):
     form = HotelForm(request.POST or None, request.FILES or None)
@@ -196,7 +248,6 @@ def hotel_create(request):
 
     return render(request, 'host/hotel_form.html', {'form': form, 'next': next_url})
 
-
 def hotel_update(request, pk):
     hotel = get_object_or_404(Hotel, pk=pk)
     form = HotelForm(request.POST or None, request.FILES or None, instance=hotel)
@@ -208,7 +259,6 @@ def hotel_update(request, pk):
 
     return render(request, 'host/hotel_form.html', {'form': form,'next': next_url})
 
-
 def hotel_delete(request, pk):
     hotel = get_object_or_404(Hotel, pk=pk)
     next_url = request.GET.get('next', reverse('index'))
@@ -218,6 +268,7 @@ def hotel_delete(request, pk):
         return redirect(next_url)
 
     return render(request, 'host/hotel_confirm_delete.html', {'hotel': hotel,'next': next_url})
+
 def hotel_edit_amenities(request, hotel_id):
     hotel = get_object_or_404(Hotel, id=hotel_id)
     form = HotelAmenityForm(instance=hotel)
@@ -240,10 +291,129 @@ def user_bookings(request):
     if not user_id:
         return redirect('/')  # если не авторизован
 
-    user = get_object_or_404(User, id=user_id)
+    user = get_object_or_404(CustomUser, id=user_id)
     bookings = user.booking_set.all().select_related('room__hotel').order_by('-created_at')
     
     return render(request, 'host/user_bookings.html', {
         'user': user,
         'bookings': bookings
     })
+
+def add_review(request, hotel_id):
+    if not request.session.get('user_id'):
+        return JsonResponse({'error': 'Необходима авторизация'}, status=401)
+    
+    if request.method == 'POST':
+        user = get_object_or_404(CustomUser, id=request.session['user_id'])
+        hotel = get_object_or_404(Hotel, id=hotel_id)
+        rating = request.POST.get('rating')
+        comment = request.POST.get('comment')
+
+        if not rating or not comment:
+            return JsonResponse({'error': 'Заполните все поля'}, status=400)
+
+        review = Review.objects.create(
+            user=user,
+            hotel=hotel,
+            rating=rating,
+            comment=comment
+        )
+
+        # Возвращаем данные для обновления на странице
+        return JsonResponse({
+            'id': review.id,
+            'user_name': f"{user.first_name} {user.last_name}",
+            'rating': review.rating,
+            'comment': review.comment,
+            'date': review.created_at.strftime("%d.%m.%Y")
+        })
+
+    return JsonResponse({'error': 'Метод не поддерживается'}, status=405)
+
+def edit_review(request, review_id):
+    if not request.session.get('user_id'):
+        return JsonResponse({'error': 'Необходима авторизация'}, status=401)
+
+    review = get_object_or_404(Review, id=review_id)
+    
+    # Проверяем, что отзыв принадлежит текущему пользователю
+    if review.user.id != request.session['user_id']:
+        return JsonResponse({'error': 'Нет прав на редактирование'}, status=403)
+
+    if request.method == 'POST':
+        rating = request.POST.get('rating')
+        comment = request.POST.get('comment')
+
+        if not rating or not comment:
+            return JsonResponse({'error': 'Заполните все поля'}, status=400)
+
+        review.rating = rating
+        review.comment = comment
+        review.save()
+
+        return JsonResponse({
+            'id': review.id,
+            'rating': review.rating,
+            'comment': review.comment,
+            'date': review.created_at.strftime("%d.%m.%Y")
+        })
+
+    return JsonResponse({'error': 'Метод не поддерживается'}, status=405)
+
+def delete_review(request, review_id):
+    if not request.session.get('user_id'):
+        return JsonResponse({'error': 'Необходима авторизация'}, status=401)
+
+    review = get_object_or_404(Review, id=review_id)
+    
+    # Проверяем, что отзыв принадлежит текущему пользователю
+    if review.user.id != request.session['user_id']:
+        return JsonResponse({'error': 'Нет прав на удаление'}, status=403)
+
+    if request.method == 'POST':
+        review.delete()
+        return JsonResponse({'success': True})
+
+    return JsonResponse({'error': 'Метод не поддерживается'}, status=405)
+
+@require_POST
+def book_room(request, room_id):
+    if not request.session.get('user_id'):
+        return JsonResponse({
+            'success': False,
+            'message': 'Необходима авторизация'
+        }, status=401)
+
+    try:
+        user = get_object_or_404(CustomUser, id=request.session['user_id'])
+        room = get_object_or_404(Room, id=room_id)
+        
+        # Устанавливаем даты бронирования
+        check_in = timezone.now().date()
+        check_out = check_in + timezone.timedelta(days=1)
+        
+        # Рассчитываем итоговую стоимость
+        days = (check_out - check_in).days
+        final_price = room.price_per_night * days
+        
+        # Создаем бронирование
+        booking = Booking.objects.create(
+            user=user,
+            room=room,
+            check_in_date=check_in,
+            check_out_date=check_out,
+            final_price=final_price,
+            status='pending'  # Статус "ожидает подтверждения"
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Номер успешно забронирован',
+            'booking_id': booking.id
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        }, status=400)

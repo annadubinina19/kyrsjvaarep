@@ -12,6 +12,8 @@ import os
 from django.contrib import messages
 from django.utils import timezone
 from django.core.files.base import ContentFile
+from .admin_export import ExcelExportMixin
+from simple_history.admin import SimpleHistoryAdmin
 
 from .models import (
     User, Hotel, Amenity, HotelAmenity, Room, Review, Promotion, HotelService, Booking, Payment
@@ -62,21 +64,23 @@ class PaymentInline(admin.TabularInline):
 
 # Админка для User
 @admin.register(User)
-class UserAdmin(admin.ModelAdmin):
+class UserAdmin(SimpleHistoryAdmin):
     list_display = ('last_name', 'first_name', 'email', 'phone_number', 'role')
     list_filter = ('role',)
     search_fields = ('last_name', 'first_name', 'email')
     readonly_fields = ('password',)
+    history_list_display = ['last_name', 'first_name', 'email', 'phone_number', 'role']
 
 # Админка для Hotel
 @admin.register(Hotel)
-class HotelAdmin(admin.ModelAdmin):
+class HotelAdmin(SimpleHistoryAdmin):
     list_display = ('name', 'location', 'rating', 'contact_info', 'website', 'display_amenities_count')
     list_filter = ('location', 'rating')
     search_fields = ('name', 'location')
     inlines = [HotelAmenityInline, HotelServiceInline, ReviewInline]
     date_hierarchy = 'created_at'
     list_display_links = ('name', 'location')
+    history_list_display = ['name', 'location', 'rating', 'contact_info', 'website']
     
     fieldsets = (
         ('Основная информация', {
@@ -97,33 +101,37 @@ class HotelAdmin(admin.ModelAdmin):
 
 # Админка для Amenity
 @admin.register(Amenity)
-class AmenityAdmin(admin.ModelAdmin):
+class AmenityAdmin(SimpleHistoryAdmin):
     list_display = ('name', 'description')
     search_fields = ('name',)
+    history_list_display = ['name', 'description']
 
 # Админка для Room
 @admin.register(Room)
-class RoomAdmin(admin.ModelAdmin):
+class RoomAdmin(SimpleHistoryAdmin):
     list_display = ('room_type', 'hotel', 'price_per_night', 'max_guests', 'availability')
     list_filter = ('availability', 'hotel')
     search_fields = ('room_type', 'hotel__name')
     raw_id_fields = ('hotel',)
+    history_list_display = ['room_type', 'hotel', 'price_per_night', 'max_guests', 'availability']
 
 # Админка для Review
 @admin.register(Review)
-class ReviewAdmin(admin.ModelAdmin):
+class ReviewAdmin(SimpleHistoryAdmin):
     list_display = ('user', 'hotel', 'rating', 'comment', 'created_at')
     list_filter = ('rating', 'created_at')
     search_fields = ('user__last_name', 'hotel__name')
     raw_id_fields = ('user', 'hotel')
+    history_list_display = ['user', 'hotel', 'rating', 'comment']
 
 # Админка для Promotion
 @admin.register(Promotion)
-class PromotionAdmin(admin.ModelAdmin):
+class PromotionAdmin(SimpleHistoryAdmin):
     list_display = ('title', 'hotel', 'start_date', 'end_date', 'has_details_url', 'has_booking_url')
     list_filter = ('start_date', 'end_date', 'hotel')
     search_fields = ('title', 'hotel__name')
     raw_id_fields = ('hotel',)
+    history_list_display = ['title', 'hotel', 'start_date', 'end_date', 'details_url', 'booking_url']
     
     fieldsets = (
         ('Основная информация', {
@@ -148,14 +156,35 @@ class PromotionAdmin(admin.ModelAdmin):
 
 # Админка для Booking
 @admin.register(Booking)
-class BookingAdmin(admin.ModelAdmin):
+class BookingAdmin(ExcelExportMixin, SimpleHistoryAdmin):
     list_display = ('user', 'room', 'check_in_date', 'check_out_date', 'final_price', 'has_pdf')
     list_filter = ('check_in_date', 'check_out_date')
     search_fields = ('user__last_name', 'room__room_type')
     raw_id_fields = ('user', 'room')
     readonly_fields = ('confirmation_pdf',)
     inlines = [PaymentInline]
-    actions = ['generate_pdf']
+    actions = ['generate_pdf', 'export_as_excel']
+    history_list_display = ['user', 'room', 'check_in_date', 'check_out_date', 'final_price', 'status']
+
+    def get_export_fields(self):
+        
+        return ['user', 'room', 'check_in_date', 'check_out_date', 'final_price', 'status']
+
+    def dehydrate_user(self, obj):
+       
+        return f"{obj.user.first_name} {obj.user.last_name}"
+
+    def dehydrate_room(self, obj):
+        
+        return f"{obj.room.hotel.name} - {obj.room.get_room_type_display()}"
+
+    def get_user_header(self):
+        
+        return "Guest Name"
+
+    def get_room_header(self):
+        
+        return "Hotel and Room"
 
     def has_pdf(self, obj):
         """Проверяет, есть ли PDF файл у бронирования"""
@@ -164,14 +193,14 @@ class BookingAdmin(admin.ModelAdmin):
     has_pdf.short_description = "PDF сгенерирован"
 
     def generate_pdf(self, request, queryset):
-        # Create a file-like buffer to receive PDF data
+       
         buffer = BytesIO()
         
-        # Create the PDF object, using the buffer as its "file"
+        
         doc = SimpleDocTemplate(buffer, pagesize=letter)
         elements = []
         
-        # Define styles with Arial font
+        
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
             'CustomTitle',
@@ -185,7 +214,7 @@ class BookingAdmin(admin.ModelAdmin):
             # Add title
             elements.append(Paragraph(f'Подтверждение бронирования #{booking.id}', title_style))
             
-            # Create data for the table
+            
             data = [
                 ['Информация о бронировании', ''],
                 ['Гость', f'{booking.user.first_name} {booking.user.last_name}'],
@@ -197,7 +226,7 @@ class BookingAdmin(admin.ModelAdmin):
                 ['Дата генерации', timezone.now().strftime('%d.%m.%Y %H:%M:%S')],
             ]
             
-            # Create table with Arial font
+            
             table = Table(data, colWidths=[200, 300])
             table.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
@@ -214,10 +243,10 @@ class BookingAdmin(admin.ModelAdmin):
             ]))
             elements.append(table)
         
-        # Build PDF
+        
         doc.build(elements)
         
-        # Get the value of the BytesIO buffer
+        
         pdf_content = buffer.getvalue()
         buffer.close()
         
@@ -245,8 +274,9 @@ class BookingAdmin(admin.ModelAdmin):
 
 # Админка для Payment
 @admin.register(Payment)
-class PaymentAdmin(admin.ModelAdmin):
+class PaymentAdmin(SimpleHistoryAdmin):
     list_display = ('booking', 'payment_method', 'amount', 'date')
     list_filter = ('payment_method', 'date')
     search_fields = ('booking__user__last_name',)
     raw_id_fields = ('booking',)
+    history_list_display = ['booking', 'payment_method', 'amount', 'date']

@@ -5,10 +5,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Путешествуй с нами</title>
+    <title>{{ hotel.name }} - Путешествуй с нами</title>
     {% load static %}
-    <link rel="stylesheet" href="{% static 'css/room.css' %}">
-    <script src="{% static 'js/login.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'css/rooms.css' %}">
+    <script src="{% static 'js/logg.js' %}"></script>
+    <script src="{% static 'js/reviews.js' %}"></script>
+    <script src="{% static 'js/booking.js' %}"></script>
+    <script>
+        const hotelId = {{ hotel.id }};
+    </script>
 </head>
 <body>
     <header class="site-header">
@@ -24,27 +29,215 @@
                     <li><a href="#">Контакты</a></li>
                 </ul>
             </nav>
-            {% if request.session.user_id %}
-  <div>Добро пожаловать, {{ request.session.user_name }}!</div>
-  <a href="/profile/">👤 Личный кабинет</a>
-  <a href="/logout/">Выход</a>
-{% else %}
-  <a href="#" class="login-button" onclick="openLoginModal()">Вход</a>
-{% endif %}
+            <div class="auth-buttons">
+                {% if request.session.user_id %}
+                    <div class="user-info">Добро пожаловать, {{ request.session.user_name }}!</div>
+                    <a href="/profile/" class="profile-btn">👤 Личный кабинет</a>
+                    <a href="/logout/" class="logout-btn">Выход</a>
+                {% else %}
+                    <a href="#" class="login-button" onclick="openLoginModal()">Вход</a>
+                {% endif %}
+            </div>
         </div>
-<h2>{{ hotel.name }}</h2>
-<p><strong>Город:</strong> {{ hotel.location }}</p>
-<p><strong>Контакты:</strong> {{ hotel.contact_info }}</p>
-<p><strong>Описание:</strong> {{ hotel.description }}</p>
+    </header>
 
-<h3>Доступные номера:</h3>
-{% get_rooms_by_hotel hotel.id as rooms %}
-{% for room in rooms %}
-    <div class="room-card">
-        <p><strong>Тип:</strong> {{ room.room_type }}</p>
-        <p><strong>Цена за ночь:</strong> {{ room.price_per_night|currency_format }} </p>
-        <p><strong>Макс. гостей:</strong> {{ room.max_guests }}</p>
+    <main class="hotel-detail">
+        <!-- Секция с информацией об отеле -->
+        <section class="hotel-info-section">
+            <div class="hotel-header">
+                <div class="hotel-main-info">
+                    <h1>{{ hotel.name }}</h1>
+                    <div class="hotel-rating">
+                        <span class="stars">
+                            {% for _ in hotel.rating|get_range %}
+                                ⭐
+                            {% endfor %}
+                        </span>
+                        <span class="rating-number">{{ hotel.rating }}/5</span>
+                    </div>
+                    <p class="hotel-location">📍 {{ hotel.location }}</p>
+                </div>
+                {% if hotel.website %}
+                    <a href="{{ hotel.website }}" class="hotel-website-btn" target="_blank">Официальный сайт</a>
+                {% endif %}
+            </div>
+
+            <div class="hotel-content">
+                {% if hotel.photo %}
+                    <div class="hotel-main-photo">
+                        <img src="{{ hotel.photo.url }}" alt="{{ hotel.name }}">
+                    </div>
+                {% endif %}
+                
+                <div class="hotel-details">
+                    <div class="detail-block">
+                        <h3>Об отеле</h3>
+                        <p>{{ hotel.description }}</p>
+                    </div>
+                    
+                    <div class="detail-block">
+                        <h3>Контактная информация</h3>
+                        <p>📞 {{ hotel.contact_info }}</p>
+                        {% if hotel.booking_url %}
+                            <a href="{{ hotel.booking_url }}" class="book-hotel-btn" target="_blank">Забронировать на сайте отеля</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Секция с номерами -->
+        <section class="rooms-section">
+            <h2>Доступные номера</h2>
+            <div class="rooms-grid">
+                {% get_rooms_by_hotel hotel.id as rooms %}
+                {% for room in rooms %}
+                    <div class="room-card">
+                        {% if room.photo %}
+                            <div class="room-photo">
+                                <img src="{{ room.photo.url }}" alt="Номер {{ room.get_room_type_display }}">
+                            </div>
+                        {% endif %}
+                        <div class="room-info">
+                            <h3>{{ room.get_room_type_display }}</h3>
+                            <div class="room-details">
+                                <p class="room-price">{{ room.price_per_night|currency_format }} за ночь</p>
+                                <p class="room-capacity">До {{ room.max_guests }} гостей</p>
+                            </div>
+                            <button class="book-room-btn" data-room-id="{{ room.id }}" onclick="bookRoom(this)">Забронировать</button>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="no-rooms">В данный момент нет доступных номеров</p>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- Секция с отзывами -->
+        <section class="reviews-section">
+            <h2>Отзывы гостей</h2>
+            
+            {% if request.session.user_id %}
+                <div class="add-review-button">
+                    <button onclick="openReviewModal()" class="add-review-btn">Добавить отзыв</button>
+                </div>
+            {% endif %}
+
+            <div class="reviews-grid">
+                {% for review in hotel.review_set.all %}
+                    <div class="review-card" id="review-{{ review.id }}">
+                        <div class="review-header">
+                            <div class="reviewer-info">
+                                <h3>{{ review.user.first_name }} {{ review.user.last_name }}</h3>
+                                <p class="review-date">{{ review.created_at|date:"d.m.Y" }}</p>
+                            </div>
+                            <div class="review-rating">
+                                <span class="stars">
+                                    {% for _ in review.rating|get_range %}
+                                        ⭐
+                                    {% endfor %}
+                                </span>
+                                <span class="rating-number">{{ review.rating }}/5</span>
+                            </div>
+                        </div>
+                        <div class="review-content">
+                            <p>{{ review.comment }}</p>
+                        </div>
+                        {% if request.session.user_id == review.user.id %}
+                            <div class="review-actions">
+                                <button onclick="openEditReviewModal({{ review.id }}, '{{ review.comment|escapejs }}', {{ review.rating }})" class="edit-review-btn">Редактировать</button>
+                                <button onclick="deleteReview({{ review.id }})" class="delete-review-btn">Удалить</button>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% empty %}
+                    <p class="no-reviews">Пока нет отзывов об этом отеле</p>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+
+    <!-- Модальное окно для добавления отзыва -->
+    <div id="reviewModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeReviewModal()">&times;</span>
+            <h2>Добавить отзыв</h2>
+            <form id="reviewForm" onsubmit="submitReview(event)">
+                <div class="rating-select">
+                    <label>Оценка:</label>
+                    <select name="rating" required>
+                        <option value="5">5 ⭐</option>
+                        <option value="4">4 ⭐</option>
+                        <option value="3">3 ⭐</option>
+                        <option value="2">2 ⭐</option>
+                        <option value="1">1 ⭐</option>
+                    </select>
+                </div>
+                <div class="comment-input">
+                    <label>Комментарий:</label>
+                    <textarea name="comment" required></textarea>
+                </div>
+                <button type="submit">Отправить</button>
+            </form>
+        </div>
     </div>
-{% empty %}
-    <p>Нет доступных номеров.</p>
-{% endfor %}
+
+    <!-- Модальное окно для редактирования отзыва -->
+    <div id="editReviewModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditReviewModal()">&times;</span>
+            <h2>Редактировать отзыв</h2>
+            <form id="editReviewForm" onsubmit="submitEditReview(event)">
+                <input type="hidden" name="review_id" id="edit_review_id">
+                <div class="rating-select">
+                    <label>Оценка:</label>
+                    <select name="rating" id="edit_rating" required>
+                        <option value="5">5 ⭐</option>
+                        <option value="4">4 ⭐</option>
+                        <option value="3">3 ⭐</option>
+                        <option value="2">2 ⭐</option>
+                        <option value="1">1 ⭐</option>
+                    </select>
+                </div>
+                <div class="comment-input">
+                    <label>Комментарий:</label>
+                    <textarea name="comment" id="edit_comment" required></textarea>
+                </div>
+                <button type="submit">Сохранить изменения</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно для входа -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeLoginModal()">&times;</span>
+            <div id="loginForm">
+                <h2>Вход</h2>
+                <div id="login-message" class="message"></div>
+                <form id="login-form" method="POST" action="/login/">
+                    {% csrf_token %}
+                    <input type="email" name="email" placeholder="Email" required>
+                    <input type="password" name="password" placeholder="Пароль" required>
+                    <button type="submit">Войти</button>
+                </form>
+                <p>Нет аккаунта? <a href="#" onclick="showRegisterForm()">Зарегистрироваться</a></p>
+            </div>
+            <div id="registerForm" style="display:none;">
+                <h2>Регистрация</h2>
+                <div id="register-message" class="message"></div>
+                <form id="register-form" method="POST" action="/register/">
+                    {% csrf_token %}
+                    <input type="text" name="last_name" placeholder="Фамилия" required>
+                    <input type="text" name="first_name" placeholder="Имя" required>
+                    <input type="email" name="email" placeholder="Email" required>
+                    <input type="password" name="password" placeholder="Пароль" required>
+                    <input type="tel" name="phone_number" placeholder="Телефон" required>
+                    <button type="submit">Зарегистрироваться</button>
+                </form>
+                <p>Уже есть аккаунт? <a href="#" onclick="showLoginForm()">Войти</a></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
